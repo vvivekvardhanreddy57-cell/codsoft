@@ -1,0 +1,34 @@
+import numpy as np
+import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Sample ratings data
+# Rows: users, Columns: movies
+ratings = pd.DataFrame({
+    'Movie1': [5, 4, np.nan, 1],
+    'Movie2': [4, np.nan, 5, 1],
+    'Movie3': [1, 1, 2, 5]
+}, index=['UserA', 'UserB', 'UserC', 'UserD'])
+
+# Fill NaN with 0 for similarity calculation (or use user/item means for imputation)
+ratings_filled = ratings.fillna(0)
+
+# Compute user similarity
+user_similarity = cosine_similarity(ratings_filled)
+user_similarity_df = pd.DataFrame(user_similarity, index=ratings.index, columns=ratings.index)
+
+def recommend_movie(user, ratings, user_similarity_df, top_n=1):
+    # Find users most similar to 'user'
+    similar_users = user_similarity_df[user].sort_values(ascending=False)[1:]  # exclude self
+    most_similar_user = similar_users.index[0]
+    
+    # Recommend movies liked by the most similar user that 'user' hasn't seen
+    user_ratings = ratings.loc[user]
+    similar_user_ratings = ratings.loc[most_similar_user]
+    recommendations = similar_user_ratings[user_ratings.isnull()]
+    recommendations = recommendations.sort_values(ascending=False).head(top_n)
+    return recommendations
+
+# Example: Recommend one movie to 'UserC'
+print("Recommended for UserC:")
+print(recommend_movie('UserC', ratings, user_similarity_df))
