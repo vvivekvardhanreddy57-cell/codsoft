@@ -1,0 +1,68 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.preprocessing import image
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, LSTM, Embedding, Dense, Add
+
+# 1. Feature Extractor (CNN)
+def build_feature_extractor():
+    base_model = ResNet50(weights='imagenet', include_top=False, pooling='avg')
+    return Model(inputs=base_model.input, outputs=base_model.output)
+
+def extract_features(img_path, model):
+    img = image.load_img(img_path, target_size=(224, 224))
+    x = image.img_to_array(img)
+    x = np.expand_dims(x, axis=0)
+    x = tf.keras.applications.resnet50.preprocess_input(x)
+    return model.predict(x)
+
+# 2. Caption Generator (RNN example)
+def build_caption_generator(vocab_size, max_length, embedding_dim=256, units=256):
+    # Inputs
+    img_features_input = Input(shape=(2048,))
+    caption_input = Input(shape=(max_length,))
+    
+    # Image feature
+    fe1 = Dense(units, activation='relu')(img_features_input)
+    
+    # Text feature
+    x = Embedding(vocab_size, embedding_dim, mask_zero=True)(caption_input)
+    x = LSTM(units)(x)
+    
+    # Combine
+    merged = Add()([fe1, x])
+    output = Dense(vocab_size, activation='softmax')(merged)
+    
+    model = Model(inputs=[img_features_input, caption_input], outputs=output)
+    return model
+
+# Pseudo code for dataset preprocessing (you'll need captions, tokenization, etc.)
+# - Load images and captions
+# - Tokenize captions and build vocab
+# - Pad sequences, split data into train/test
+
+# Inference: Generate a caption for an image
+def generate_caption(model, tokenizer, photo, max_length):
+    in_text = 'startseq'
+    for i in range(max_length):
+        sequence = tokenizer.texts_to_sequences([in_text])[0]
+        sequence = pad_sequences([sequence], maxlen=max_length)
+        yhat = np.argmax(model.predict([photo,sequence]), axis=-1)
+        word = tokenizer.index_word.get(yhat[0], None)
+        if word is None or word == 'endseq':
+            break
+        in_text += ' ' + word
+    return in_text.replace('startseq', '').strip()
+
+# Usage Example
+'''
+feature_extractor = build_feature_extractor()
+photo_feature = extract_features('example.jpg', feature_extractor)
+
+# Load tokenizers and trained caption model
+caption_model = build_caption_generator(vocab_size, max_length)
+caption = generate_caption(caption_model, tokenizer, photo_feature, max_length)
+print('Caption:', caption)
+'''
